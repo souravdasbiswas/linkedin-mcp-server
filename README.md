@@ -4,6 +4,8 @@ A Model Context Protocol (MCP) server that provides AI assistants with access to
 
 **Official API only.** No scraping, no unofficial endpoints, no account risk.
 
+[![LinkedIn Server MCP server](https://glama.ai/mcp/servers/souravdasbiswas/linkedin-mcp-server/badges/card.svg)](https://glama.ai/mcp/servers/souravdasbiswas/linkedin-mcp-server)
+
 ## Features
 
 ### Self-Serve Tools (No LinkedIn Approval Required)
