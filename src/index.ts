@@ -5,6 +5,7 @@
  * Starts the server with stdio transport for local CLI use.
  */
 
+import 'dotenv/config';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { join } from 'node:path';
 import { homedir } from 'node:os';

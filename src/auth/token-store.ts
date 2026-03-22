@@ -119,6 +119,28 @@ export class TokenStore {
     this.db.prepare('DELETE FROM pkce_state WHERE created_at < ?').run(cutoff);
   }
 
+  /**
+   * Find any stored user with a valid (non-expired) token.
+   * For single-user stdio mode, returns the most recently created token's user ID.
+   */
+  findActiveUser(): string | null {
+    const row = this.db
+      .prepare('SELECT user_id, expires_at FROM tokens ORDER BY created_at DESC LIMIT 1')
+      .get() as { user_id: string; expires_at: number } | undefined;
+
+    if (!row) return null;
+
+    // Check if token is still valid (with 5-minute buffer)
+    if (Date.now() >= row.expires_at - 5 * 60 * 1000) return null;
+
+    return row.user_id;
+  }
+
+  /** Expose the underlying database for shared tables (e.g., post history). */
+  getDatabase(): Database.Database {
+    return this.db;
+  }
+
   close(): void {
     this.db.close();
   }
