@@ -39,23 +39,70 @@ A Model Context Protocol (MCP) server that provides AI assistants with access to
 ## Prerequisites
 
 1. **Node.js 20+**
-2. **LinkedIn Developer App** - Create one at [linkedin.com/developers/apps](https://www.linkedin.com/developers/apps)
-3. Enable these products in your app's Products tab:
-   - **Sign In with LinkedIn using OpenID Connect**
-   - **Share on LinkedIn**
+2. **LinkedIn Developer App** (see setup steps below)
+
+## LinkedIn App Setup
+
+### Step 1: Create a LinkedIn Developer App
+
+1. Go to [linkedin.com/developers/apps](https://www.linkedin.com/developers/apps) and sign in
+2. Click **Create app**
+3. Fill in the required fields:
+   - **App name**: Choose any name (e.g., "My MCP LinkedIn")
+   - **LinkedIn Page**: Select your LinkedIn page, or create one if needed
+   - **Privacy policy URL**: Can use your website URL or a placeholder
+   - **App logo**: Upload any image (required)
+4. Check the legal agreement box and click **Create app**
+
+### Step 2: Get Your Client ID and Client Secret
+
+1. After creating the app, you'll land on the app settings page
+2. Go to the **Auth** tab
+3. Copy the **Client ID** - you'll need this for configuration
+4. Copy the **Client Secret** (click the eye icon to reveal it) - you'll need this too
+
+### Step 3: Add the Redirect URL
+
+1. Still on the **Auth** tab, scroll to **OAuth 2.0 settings**
+2. Under **Authorized redirect URLs for your app**, click **Add redirect URL**
+3. Enter: `http://localhost:3000/callback`
+4. Click **Update** to save
+
+> **Important**: The redirect URL must match exactly - including the protocol (`http://`), port (`:3000`), and path (`/callback`). No trailing slash.
+
+### Step 4: Enable Required Products
+
+1. Go to the **Products** tab on your app page
+2. Request access to these two products:
+   - **Sign In with LinkedIn using OpenID Connect** - click **Request access**, review terms, and accept
+   - **Share on LinkedIn** - click **Request access**, review terms, and accept
+3. Both products are typically approved instantly for self-serve use
+
+> **Verify**: After enabling, go back to the **Auth** tab. Under **OAuth 2.0 scopes**, you should see: `openid`, `profile`, `email`, `w_member_social`.
 
 ## Quick Start
 
 ### 1. Install
 
 ```bash
+git clone https://github.com/souravdasbiswas/linkedin-mcp-server.git
+cd linkedin-mcp-server
 npm install
 npm run build
 ```
 
 ### 2. Configure Your MCP Client
 
-Add to your MCP client configuration (e.g., Claude Desktop `claude_desktop_config.json`):
+**For Claude Code** (recommended):
+
+```bash
+claude mcp add linkedin \
+  -e LINKEDIN_CLIENT_ID=your_client_id \
+  -e LINKEDIN_CLIENT_SECRET=your_client_secret \
+  -- node /path/to/linkedin-mcp-server/dist/index.js
+```
+
+Or add manually to `~/.claude.json`:
 
 ```json
 {
@@ -72,7 +119,7 @@ Add to your MCP client configuration (e.g., Claude Desktop `claude_desktop_confi
 }
 ```
 
-For Claude Code, add to `.claude/settings.json`:
+**For Claude Desktop**, add to `claude_desktop_config.json`:
 
 ```json
 {
@@ -88,6 +135,8 @@ For Claude Code, add to `.claude/settings.json`:
   }
 }
 ```
+
+Replace `your_client_id` and `your_client_secret` with the values from Step 2.
 
 ### 3. Authenticate
 
@@ -95,7 +144,16 @@ Once connected, tell your AI assistant:
 
 > "Authenticate with LinkedIn"
 
-The assistant will use `linkedin_auth_start` to generate an OAuth URL. Open it in your browser, authorize the app, and provide the callback URL parameters back to the assistant.
+The assistant will generate an OAuth URL. Here's what happens:
+
+1. Open the URL in your browser
+2. Sign in to LinkedIn and click **Allow** to authorize the app
+3. LinkedIn redirects to `http://localhost:3000/callback?code=XXX&state=YYY`
+4. Since there's no local server listening, you'll see a "page not found" error - **that's expected**
+5. Copy the full URL from your browser's address bar and paste it back to the assistant
+6. The assistant extracts the `code` and `state` parameters and completes authentication
+
+After the first authentication, your session persists across server restarts (token is valid for 60 days). You only need to re-authenticate when the token expires.
 
 ### 4. Use It
 
