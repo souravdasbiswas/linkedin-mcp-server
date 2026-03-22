@@ -22,12 +22,15 @@ A Model Context Protocol (MCP) server that provides AI assistants with access to
 | `linkedin_create_comment` | Comment on posts |
 | `linkedin_react_to_post` | React to posts (like, celebrate, support, love, insightful, funny) |
 | `linkedin_upload_image` | Upload images for posts |
+| `linkedin_list_my_posts` | List posts created through this server with URNs for reference |
 | `linkedin_create_event` | Create LinkedIn events |
 | `linkedin_get_event` | Get event details |
 
 ### Architecture Highlights
 
-- **OAuth 2.0 + PKCE** - Secure authentication with token persistence
+- **OAuth 2.0** - Secure authentication with persistent token storage
+- **Session auto-restore** - Survives server restarts without re-authentication (until token expires)
+- **Post history tracking** - Local SQLite log of posts created through the server for easy reference and deletion
 - **Adaptive rate limiting** - Learns LinkedIn's actual limits from response headers
 - **Automatic retry** - Exponential backoff for transient failures (429, 5xx)
 - **Capability detection** - Only exposes tools matching your granted scopes
@@ -99,6 +102,8 @@ The assistant will use `linkedin_auth_start` to generate an OAuth URL. Open it i
 Example prompts:
 
 - "Post to LinkedIn: Just shipped a new feature that reduces API latency by 40%"
+- "List my LinkedIn posts" - see all posts you've made through the server
+- "Delete my last LinkedIn post"
 - "Create a LinkedIn event for our team meetup next Friday at 2pm"
 - "React to this LinkedIn post with a celebrate reaction"
 - "What's my LinkedIn profile info?"
@@ -156,15 +161,16 @@ src/
   index.ts              # Entry point, stdio transport
   server.ts             # MCP server wiring
   auth/
-    oauth2.ts           # OAuth 2.0 + PKCE flow
-    token-store.ts      # SQLite token persistence
-    pkce.ts             # PKCE challenge generation
+    oauth2.ts           # OAuth 2.0 flow + token exchange
+    token-store.ts      # SQLite token persistence + session auto-restore
+    pkce.ts             # PKCE challenge generation (available for public clients)
     tools.ts            # Auth MCP tools
   client/
     api-client.ts       # HTTP client with retry
     rate-limiter.ts     # Adaptive rate limiting
     version-manager.ts  # LinkedIn API versioning
     errors.ts           # Structured error types
+    post-history.ts     # Local post tracking (SQLite)
   capabilities/
     detector.ts         # Scope-based capability detection
   modules/

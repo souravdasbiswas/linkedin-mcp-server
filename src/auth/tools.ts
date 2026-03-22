@@ -13,6 +13,7 @@ export function registerAuthTools(
   authManager: OAuth2Manager,
   capabilityDetector: CapabilityDetector,
   currentUserId: () => string | null,
+  setCurrentUserId: (userId: string) => void,
 ): void {
   server.tool(
     'linkedin_auth_start',
@@ -73,6 +74,7 @@ export function registerAuthTools(
     async ({ code, state }) => {
       try {
         const token = await authManager.handleCallback(code, state);
+        setCurrentUserId(token.userId);
         const modules = capabilityDetector.detect(token.scopes);
         const summary = capabilityDetector.getSummary(modules);
 

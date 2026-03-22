@@ -6,6 +6,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { LinkedInApiClient } from '../../client/api-client.js';
+import type { PostHistory } from '../../client/post-history.js';
 import type {
   CreatePostRequest,
   Post,
@@ -19,6 +20,7 @@ export function registerPostingTools(
   server: McpServer,
   apiClient: LinkedInApiClient,
   getUserId: () => Promise<string>,
+  postHistory: PostHistory,
 ): void {
   server.tool(
     'linkedin_create_post',
@@ -81,6 +83,18 @@ export function registerPostingTools(
         }
 
         const result = await apiClient.post<{ id: string }>('/v2/posts', postRequest);
+        const postUrn = result?.id ?? `unknown-${Date.now()}`;
+
+        // Track in local history
+        postHistory.save({
+          postUrn,
+          textPreview: text,
+          visibility,
+          hasImage: !!imageUrn,
+          hasArticle: !!articleUrl,
+          articleUrl,
+          createdAt: Date.now(),
+        });
 
         return {
           content: [
@@ -89,7 +103,7 @@ export function registerPostingTools(
               text: JSON.stringify(
                 {
                   success: true,
-                  postUrn: result?.id ?? 'Post created (URN in response header)',
+                  postUrn,
                   visibility,
                   message: 'Post published successfully to LinkedIn.',
                 },
@@ -123,6 +137,9 @@ export function registerPostingTools(
       try {
         const encodedUrn = encodeURIComponent(postUrn);
         await apiClient.delete(`/v2/posts/${encodedUrn}`);
+
+        // Remove from local history
+        postHistory.remove(postUrn);
 
         return {
           content: [
@@ -321,6 +338,77 @@ export function registerPostingTools(
             {
               type: 'text' as const,
               text: `Failed to upload image: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.tool(
+    'linkedin_list_my_posts',
+    'List posts you created through this MCP server. Shows text preview, visibility, and URN for each post.',
+    {
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .default(10)
+        .describe('Maximum number of posts to return (default 10, max 50)'),
+    },
+    async ({ limit }) => {
+      try {
+        const posts = postHistory.list(limit);
+
+        if (posts.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: 'No posts found. Posts created through this MCP server will appear here.',
+              },
+            ],
+          };
+        }
+
+        const total = postHistory.count();
+        const lines: string[] = [`Showing ${posts.length} of ${total} tracked posts:\n`];
+
+        posts.forEach((post, i) => {
+          const date = new Date(post.createdAt);
+          const dateStr = date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          });
+          const tags: string[] = [];
+          if (post.hasImage) tags.push('image');
+          if (post.hasArticle) tags.push('article');
+          const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+          const preview =
+            post.textPreview.length > 80
+              ? post.textPreview.substring(0, 80) + '...'
+              : post.textPreview;
+
+          lines.push(
+            `${i + 1}. [${dateStr}] "${preview}" (${post.visibility})${tagStr}`,
+            `   URN: ${post.postUrn}`,
+            '',
+          );
+        });
+
+        return {
+          content: [{ type: 'text' as const, text: lines.join('\n') }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Failed to list posts: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

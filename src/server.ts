@@ -12,6 +12,7 @@ import { CapabilityDetector } from './capabilities/detector.js';
 import { registerProfileTools } from './modules/profile/tools.js';
 import { registerPostingTools } from './modules/posting/tools.js';
 import { registerEventTools } from './modules/events/tools.js';
+import { PostHistory } from './client/post-history.js';
 import type { ServerConfig } from './types/index.js';
 
 export interface ServerDependencies {
@@ -31,15 +32,13 @@ export function createLinkedInMcpServer(deps: ServerDependencies) {
   // Initialize capability detection
   const capabilityDetector = new CapabilityDetector();
 
-  // Track current user ID - set when a token exists
-  let currentUserId: string | null = null;
+  // Initialize post history tracker
+  const postHistory = new PostHistory(tokenStore.getDatabase());
 
-  // Check for existing token
-  // The token store uses user ID as key; we try to find one
-  // In a multi-user scenario, this would be session-based
+  // Auto-restore session from stored token (survives server restarts)
+  let currentUserId: string | null = tokenStore.findActiveUser();
+
   const findExistingUser = (): string | null => {
-    // For stdio (single-user), we use a sentinel key to find any stored user
-    // This gets set properly after auth callback
     return currentUserId;
   };
 
@@ -71,7 +70,9 @@ export function createLinkedInMcpServer(deps: ServerDependencies) {
   });
 
   // Always register auth tools
-  registerAuthTools(server, authManager, capabilityDetector, () => currentUserId);
+  registerAuthTools(server, authManager, capabilityDetector, () => currentUserId, (userId: string) => {
+    currentUserId = userId;
+  });
 
   // Detect capabilities and register appropriate modules
   const grantedScopes = currentUserId ? authManager.getGrantedScopes(currentUserId) : [];
@@ -81,7 +82,7 @@ export function createLinkedInMcpServer(deps: ServerDependencies) {
   // They will return auth errors if not authenticated yet
   // This is better UX than hiding tools - user can see what's available
   registerProfileTools(server, apiClient);
-  registerPostingTools(server, apiClient, getUserId);
+  registerPostingTools(server, apiClient, getUserId, postHistory);
   registerEventTools(server, apiClient, getUserId);
 
   // Return server and a way to update the user ID after auth

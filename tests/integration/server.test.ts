@@ -93,6 +93,7 @@ describe('LinkedIn MCP Server Integration', () => {
       expect(toolNames).toContain('linkedin_create_comment');
       expect(toolNames).toContain('linkedin_react_to_post');
       expect(toolNames).toContain('linkedin_upload_image');
+      expect(toolNames).toContain('linkedin_list_my_posts');
 
       // Event tools
       expect(toolNames).toContain('linkedin_create_event');
@@ -267,7 +268,6 @@ describe('LinkedIn MCP Server Integration', () => {
       const text = (result.content as Array<{ type: string; text: string }>)[0].text;
       expect(text).toContain('authorization');
       expect(text).toContain('client_id=test-client-id');
-      expect(text).toContain('code_challenge');
       expect(text).toContain('State:');
     });
 

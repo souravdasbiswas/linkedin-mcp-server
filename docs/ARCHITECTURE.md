@@ -94,11 +94,18 @@ HTTP Request
 
 ```
 First Use:
-  linkedin_auth_start --> Generate PKCE + OAuth URL
+  linkedin_auth_start --> Generate OAuth URL (state param for CSRF protection)
   User authorizes in browser
-  linkedin_auth_callback --> Exchange code for token
+  linkedin_auth_callback --> Exchange code + client_secret for token
   Token stored in SQLite (~/.linkedin-mcp/tokens.db)
+  currentUserId set in memory
   Token valid for 60 days
+
+Server Restart (auto-restore):
+  Server starts --> tokenStore.findActiveUser()
+  If valid token exists in SQLite --> Set currentUserId automatically
+  If no valid token --> Tools return "Not authenticated" error
+  User only re-authenticates when token actually expires
 
 Subsequent Uses:
   Tool call --> getAccessToken()
@@ -118,7 +125,7 @@ Each functional area is an independent module that registers its own MCP tools.
 ```
 modules/
   profile/tools.ts    # registerProfileTools(server, apiClient)
-  posting/tools.ts    # registerPostingTools(server, apiClient, getUserId)
+  posting/tools.ts    # registerPostingTools(server, apiClient, getUserId, postHistory)
   events/tools.ts     # registerEventTools(server, apiClient, getUserId)
 ```
 
@@ -167,6 +174,28 @@ Posting Module handler:
   |
   v
 Return MCP result: { success: true, postUrn: "urn:li:share:123" }
+  |
+  v
+Post saved to local history (SQLite post_history table)
+  - text preview (first 200 chars), visibility, timestamps, flags
+```
+
+### Listing and Deleting Posts
+
+```
+User: "List my LinkedIn posts"
+  |
+  v
+linkedin_list_my_posts --> postHistory.list(limit)
+  --> Reads from local SQLite post_history table
+  --> Returns numbered list with date, preview, visibility, URN
+
+User: "Delete post urn:li:share:123"
+  |
+  v
+linkedin_delete_post --> apiClient.delete('/v2/posts/...')
+  --> On success: postHistory.remove(postUrn)
+  --> Post removed from both LinkedIn and local history
 ```
 
 ## Rate Limiting Strategy
@@ -210,9 +239,24 @@ SQLite via `better-sqlite3` stores:
 | Table | Purpose |
 |-------|---------|
 | `tokens` | OAuth access/refresh tokens, scopes, expiry timestamps |
-| `pkce_state` | Temporary PKCE code verifiers during auth flow (auto-cleaned after 30min) |
+| `pkce_state` | Temporary OAuth state for callback validation (auto-cleaned after 30min) |
+| `post_history` | Local record of posts created through this server (URN, text preview, visibility, timestamps) |
 
 WAL mode is enabled for concurrent read performance. The database lives at `~/.linkedin-mcp/tokens.db` by default.
+
+### Post History Schema
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `post_urn` | TEXT (PK) | LinkedIn post URN |
+| `text_preview` | TEXT | First 200 chars of post text |
+| `visibility` | TEXT | PUBLIC / CONNECTIONS / LOGGED_IN |
+| `has_image` | INTEGER | Whether post had an image |
+| `has_article` | INTEGER | Whether post had an article link |
+| `article_url` | TEXT | The article URL if present |
+| `created_at` | INTEGER | Creation timestamp |
+
+Note: Only posts created through this MCP server are tracked. LinkedIn's self-serve API does not provide an endpoint to list your own posts (`r_member_social` scope is restricted).
 
 ## Testing Strategy
 
@@ -241,9 +285,10 @@ The mock server (`tests/mocks/linkedin-api-mock.ts`) supports:
 
 ## Security Considerations
 
-- **PKCE** prevents authorization code interception attacks
-- **Token encryption**: Tokens are stored in SQLite, not plain files. The database is in the user's home directory with default filesystem permissions.
+- **Confidential client auth**: Client secret is used for token exchange (server-side only, never exposed to browser)
+- **State parameter**: Random 32-byte hex string prevents CSRF in OAuth flow
+- **Token storage**: Tokens are stored in SQLite in the user's home directory with default filesystem permissions
 - **No credentials in code**: Client ID/secret are environment variables only
 - **Token auto-expiry**: 5-minute safety margin before actual expiry
-- **State parameter**: Random 32-byte hex string prevents CSRF in OAuth flow
+- **Session auto-restore**: Only restores sessions with valid (non-expired) tokens
 - **No eval/exec**: All LinkedIn data is treated as untrusted; JSON.parse only

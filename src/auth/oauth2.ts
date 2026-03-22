@@ -24,14 +24,15 @@ export class OAuth2Manager {
   }
 
   /**
-   * Generate the LinkedIn OAuth authorization URL with PKCE.
+   * Generate the LinkedIn OAuth authorization URL.
+   * Uses standard OAuth 2.0 for confidential clients (client_secret).
    */
   getAuthorizationUrl(scopes?: LinkedInScope[]): AuthorizationResult {
     const state = randomBytes(32).toString('hex');
-    const pkce = generatePkceChallenge();
     const effectiveScopes = scopes ?? this.config.scopes;
 
-    this.tokenStore.savePkceState(state, pkce.codeVerifier, effectiveScopes);
+    // Store state and scopes for callback validation
+    this.tokenStore.savePkceState(state, '', effectiveScopes);
     this.tokenStore.cleanExpiredPkceStates();
 
     const params = new URLSearchParams({
@@ -40,8 +41,6 @@ export class OAuth2Manager {
       redirect_uri: this.config.redirectUri,
       state,
       scope: effectiveScopes.join(' '),
-      code_challenge: pkce.codeChallenge,
-      code_challenge_method: pkce.codeChallengeMethod,
     });
 
     const authorizationUrl = `${this.config.authBaseUrl}/authorization?${params.toString()}`;
@@ -63,7 +62,6 @@ export class OAuth2Manager {
       redirect_uri: this.config.redirectUri,
       client_id: this.config.clientId,
       client_secret: this.config.clientSecret,
-      code_verifier: pkceState.codeVerifier,
     });
 
     const response = await fetch(`${this.config.authBaseUrl}/accessToken`, {
