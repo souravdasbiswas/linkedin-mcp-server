@@ -1,5 +1,7 @@
 # LinkedIn MCP Server
 
+[![linkedin-mcp-server MCP server](https://glama.ai/mcp/servers/souravdasbiswas/linkedin-mcp-server/badges/score.svg)](https://glama.ai/mcp/servers/souravdasbiswas/linkedin-mcp-server)
+
 A Model Context Protocol (MCP) server that provides AI assistants with access to LinkedIn's official API. Create posts, manage events, and interact with LinkedIn - all through natural language via any MCP-compatible client.
 
 **Official API only.** No scraping, no unofficial endpoints, no account risk.
