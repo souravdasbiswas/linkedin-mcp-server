@@ -84,7 +84,9 @@ export class OAuth2Manager {
       userId,
       accessToken: tokenResponse.access_token,
       refreshToken: tokenResponse.refresh_token,
-      scopes: tokenResponse.scope.split(' '),
+      // LinkedIn returns scopes separated by spaces or commas depending on the
+      // endpoint version; normalise so downstream capability detection works.
+      scopes: tokenResponse.scope.split(/[\s,]+/).filter(Boolean),
       expiresAt: Date.now() + tokenResponse.expires_in * 1000,
       refreshTokenExpiresAt: tokenResponse.refresh_token_expires_in
         ? Date.now() + tokenResponse.refresh_token_expires_in * 1000
@@ -156,7 +158,9 @@ export class OAuth2Manager {
       userId,
       accessToken: tokenResponse.access_token,
       refreshToken: tokenResponse.refresh_token ?? refreshToken,
-      scopes: tokenResponse.scope.split(' '),
+      // LinkedIn returns scopes separated by spaces or commas depending on the
+      // endpoint version; normalise so downstream capability detection works.
+      scopes: tokenResponse.scope.split(/[\s,]+/).filter(Boolean),
       expiresAt: Date.now() + tokenResponse.expires_in * 1000,
       refreshTokenExpiresAt: tokenResponse.refresh_token_expires_in
         ? Date.now() + tokenResponse.refresh_token_expires_in * 1000

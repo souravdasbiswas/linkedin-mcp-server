@@ -35,7 +35,10 @@ export class CapabilityDetector {
    * Detect which modules should be enabled based on granted scopes.
    */
   detect(grantedScopes: string[]): EnabledModules {
-    const scopeSet = new Set(grantedScopes);
+    // Defensive: accept scopes joined by spaces or commas (LinkedIn varies).
+    const scopeSet = new Set(
+      grantedScopes.flatMap((scope) => scope.split(/[\s,]+/)).filter(Boolean),
+    );
 
     const modules: EnabledModules = {
       auth: true, // Always available
