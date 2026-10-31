@@ -65,11 +65,14 @@ export class TokenStore {
 
     if (!row) return null;
 
+    const storedScopes = JSON.parse(row.scopes as string) as string[];
+
     return {
       userId: row.user_id as string,
       accessToken: row.access_token as string,
       refreshToken: (row.refresh_token as string) ?? undefined,
-      scopes: JSON.parse(row.scopes as string) as string[],
+      // Tolerate tokens written before scope normalisation (comma-joined string).
+      scopes: storedScopes.flatMap((scope) => scope.split(/[\s,]+/)).filter(Boolean),
       expiresAt: row.expires_at as number,
       refreshTokenExpiresAt: (row.refresh_token_expires_at as number) ?? undefined,
       createdAt: row.created_at as number,
