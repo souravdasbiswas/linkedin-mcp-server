@@ -7,6 +7,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { LinkedInApiClient } from '../../client/api-client.js';
 import type { PostHistory } from '../../client/post-history.js';
+import { escapeLittleText } from '../../utils/little-text.js';
 import type {
   CreatePostRequest,
   Post,
@@ -51,7 +52,7 @@ export function registerPostingTools(
 
         const postRequest: CreatePostRequest = {
           author: authorUrn,
-          commentary: text,
+          commentary: escapeLittleText(text),
           visibility: visibility as PostVisibility,
           distribution: {
             feedDistribution: 'MAIN_FEED',
@@ -186,7 +187,7 @@ export function registerPostingTools(
 
         const commentRequest: CreateCommentRequest = {
           actor: actorUrn,
-          message: text,
+          message: escapeLittleText(text),
           parentComment: parentCommentUrn as `urn:li:${string}:${string}` | undefined,
         };
 
